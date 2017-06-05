@@ -17,14 +17,14 @@ function rollback() {
     supervisorctl update
 }
 
-# time the chaos server... if it crashes in 60s, then attempt a rollback
+# time the chaos server... if it crashes before 15 minutes, then attempt a rollback
 start_time=`date +%s`
 /root/.virtualenvs/chaos/bin/python chaos.py
 failed=$?
 time_elasped=`expr $(date +%s) - $start_time`
 
-if [ "$failed" -ne 0 ] && [ "$time_elasped" -le 60 ]; then
-    echo "Crashed in less than 60 seconds!" >&2
+if [ "$failed" -ne 0 ] && [ "$time_elasped" -le 900 ]; then
+    echo "Crashed in less than 15 minutes!" >&2
 
     # Only rollback if this is the production server...
     ((git remote -v | grep origin | grep -q chaosbot/Chaos) && rollback) || \

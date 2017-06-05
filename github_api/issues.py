@@ -1,6 +1,8 @@
 import arrow
 import math
 
+from requests import HTTPError
+
 
 def close_issue(api, urn, issue_id):
     path = "/repos/{urn}/issues/{issue}".format(urn=urn, issue=issue_id)
@@ -16,10 +18,14 @@ def open_issue(api, urn, issue_id):
     return resp
 
 
-def get_open_issues(api, urn):
+def get_oldest_open_issues(api, urn):
     path = "/repos/{urn}/issues".format(urn=urn)
-    data = {"state": "open"}
-    resp = api("get", path, json=data)
+    data = {
+            "state": "open",
+            "sort": "updated",
+            "direction": "asc",
+            }
+    resp = api("get", path, params=data)
     return resp
 
 
@@ -59,3 +65,26 @@ def create_issue(api, urn, title, body, labels):
             }
     resp = api("post", path, json=data)
     return resp
+
+
+def label_issue(api, urn, number, labels):
+    """ set an issues labels """
+    if not isinstance(labels, (tuple, list)):
+        labels = [labels]
+    path = "/repos/{urn}/issues/{number}/labels".format(urn=urn, number=number)
+    data = labels
+    return api("POST", path, json=data)
+
+
+def unlabel_issue(api, urn, number, labels):
+    """ unset an issues labels """
+    if not isinstance(labels, (tuple, list)):
+        labels = [labels]
+
+    for label in labels:
+        path = "/repos/{urn}/issues/{number}/labels/{label}".format(urn=urn, number=number,
+                                                                    label=label)
+        try:
+            api("DELETE", path)
+        except HTTPError:
+            pass

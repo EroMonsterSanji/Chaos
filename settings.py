@@ -1,5 +1,6 @@
 from os.path import exists, abspath, dirname, join
 import misc
+import logging
 
 
 THIS_DIR = dirname(abspath(__file__))
@@ -31,10 +32,21 @@ else:
 URN = misc.get_self_urn()
 GITHUB_USER, GITHUB_REPO = URN.split("/")
 
+# if we are running in production
+# if we switch to an org this will need changing
+IN_PRODUCTION = GITHUB_USER == "chaosbot"
+
 HOMEPAGE = "http://chaosthebot.com"
 
 # TEST SETTING PLEASE IGNORE
 TEST = False
+
+# How much logging should we do? Pick a log level for stdout and stderr.
+# Log levels are (in order) DEBUG, INFO, WARNING, ERROR, CRITICAL
+# stdout gets everything from LOG_LEVEL_OUT to (but not including) LOG_LEVEL_ERR
+# stderr gets the rest (any higher levels go here)
+LOG_LEVEL_OUT = logging.INFO
+LOG_LEVEL_ERR = logging.WARNING
 
 # the number of seconds chaosbot should sleep between polling for ready prs
 PULL_REQUEST_POLLING_INTERVAL_SECONDS = 30
@@ -46,15 +58,6 @@ DEFAULT_VOTE_WINDOW = 3.0
 
 # The maximum number of hours for how large the voting window is (extended window)
 EXTENDED_VOTE_WINDOW = 8.0
-
-# The number of hours for how large the voting window is in the "after hours"
-AFTER_HOURS_VOTE_WINDOW = 4.0
-
-# The hour (in the server time zone) when the after hours start
-AFTER_HOURS_START = 22
-
-# The hour when the after hours end
-AFTER_HOURS_END = 10
 
 # how old do voters have to be for their vote to count?
 MIN_VOTER_AGE = 1 * 30 * 24 * 60 * 60  # 1 month
@@ -81,6 +84,17 @@ TIMEZONE = "US/Pacific"
 with open("description.txt", "r") as h:
     REPO_DESCRIPTION = h.read().strip()
 
+# repo labels
+REPO_LABELS = {
+    "accepted": "0e8a16",
+    "rejected": "ededed",
+    "conflicts": "fbca04",
+    "mergeable": "dddddd",
+    "can't merge": "ededed",
+    "ci failed": "ff9800",
+    "crash report": "ff0000"
+}
+
 # PRs that have merge conflicts and haven't been touched in this many hours
 # will be closed
 PR_STALE_HOURS = 36
@@ -93,8 +107,32 @@ CHAOSBOT_FAILURE_FILE = "/tmp/chaosbot_failed"
 
 # The location of error log -- also found in the supervisor conf.
 # If you are going to change it, change it there too.
-CHAOSBOT_STDERR_LOG = "/var/log/supervisor/chaos-stderr.log"
+CHAOSBOT_STDERR_LOG = join(THIS_DIR, "log/supervisor-stderr.log")
 
 # The threshold for how old an issue has to be without comments before we try to
 # auto-close it. i.e. if an issue goes this long without comments
 ISSUE_STALE_THRESHOLD = 60 * 60 * 24 * 3  # 3 days
+
+# The top n contributors will be allowed in the meritocracy
+MERITOCRACY_TOP_CONTRIBUTORS = 10
+
+# The top n voters will be allowed in the meritocracy
+MERITOCRACY_TOP_VOTERS = 10
+
+# These users are not allowed in the meritorcracy through being a top voter
+MERITOCRACY_VOTERS_BLACKLIST = {"e-beach"}
+# Make sure usernames are lowercased
+MERITOCRACY_VOTERS_BLACKLIST = {user.lower() for user in MERITOCRACY_VOTERS_BLACKLIST}
+
+# Database settings
+DB_ADAPTER = "sqlite"
+DB_CONFIG = {
+    "filename": "db.sqlite"
+}
+# MySQL example
+# DB_CONFIG = {
+#     "host ": "localhost",
+#     "user ": "chaos",
+#     "password ": "chaos",
+#     "db ": "db"
+# }

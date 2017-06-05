@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from os.path import dirname, abspath, join, exists
+from os.path import exists
 import os
 import time
 import sys
@@ -28,12 +28,38 @@ import github_api.issues
 import encryption  # noqa: F401
 
 
+class LessThanFilter(logging.Filter):
+    """
+    Source: https://stackoverflow.com/questions/2302315
+    """
+    def __init__(self, exclusive_maximum, name=""):
+        super(LessThanFilter, self).__init__(name)
+        self.max_level = exclusive_maximum
+
+    def filter(self, record):
+        """
+        non-zero return means we log this message
+        """
+        return 1 if record.levelno < self.max_level else 0
+
+
 def main():
-    logging.basicConfig(level=logging.DEBUG,
+    # Set up logging stuff
+    logging_handler_out = logging.StreamHandler(sys.stdout)
+    logging_handler_out.setLevel(settings.LOG_LEVEL_OUT)
+    logging_handler_out.addFilter(LessThanFilter(settings.LOG_LEVEL_ERR))
+
+    logging_handler_err = logging.StreamHandler(sys.stderr)
+    logging_handler_err.setLevel(settings.LOG_LEVEL_ERR)
+
+    logging.basicConfig(level=logging.NOTSET,
                         format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                        datefmt='%m-%d %H:%M')
+                        datefmt='%m-%d %H:%M',
+                        handlers=[logging_handler_out, logging_handler_err])
+
     logging.getLogger("requests").propagate = False
     logging.getLogger("sh").propagate = False
+    logging.getLogger("peewee").propagate = False
 
     log = logging.getLogger("chaosbot")
 
@@ -50,16 +76,24 @@ def main():
 
     log.info("starting up and entering event loop")
 
-    os.system("pkill chaos_server")
+    os.system("pkill uwsgi")
 
-    server_dir = join(dirname(abspath(__file__)), "server")
-    subprocess.Popen([sys.executable, "server.py"], cwd=server_dir)
+    subprocess.Popen(["/root/.virtualenvs/chaos/bin/uwsgi",
+                      "--socket", "127.0.0.1:8085",
+                      "--wsgi-file", "webserver.py",
+                      "--callable", "__hug_wsgi__",
+                      "--check-static", "/root/workspace/Chaos/server/",
+                      "--daemonize", "/root/workspace/Chaos/log/uwsgi.log"])
 
     # Schedule all cron jobs to be run
     cron.schedule_jobs(api)
 
     log.info("Setting description to {desc}".format(desc=settings.REPO_DESCRIPTION))
     github_api.repos.set_desc(api, settings.URN, settings.REPO_DESCRIPTION)
+
+    log.info("Ensure creation of issue/PR labels")
+    for label, color in settings.REPO_LABELS.items():
+        github_api.repos.create_label(api, settings.URN, label, color)
 
     while True:
         # Run any scheduled jobs on the next second.
