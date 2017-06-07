@@ -39,13 +39,15 @@ def insert_or_update(api, cmd_obj):
     # Find the comment, or create it if it doesn't exit
     comment_id = cmd_obj["global_comment_id"]
     issue, _ = Issue.get_or_create(issue_id=cmd_obj["issue_id"])
-    user, _ = User.get_or_create(login=cmd_obj["user"]["login"],
-                                 user_id=cmd_obj["user"]["id"])
+    user, _ = User.get_or_create(user_id=cmd_obj["user"]["id"],
+                                 defaults={"login": cmd_obj["user"]["login"]})
 
     comment, _ = Comment.get_or_create(comment_id=comment_id,
-                                       user=user, text=cmd_obj["comment_text"],
-                                       created_at=cmd_obj["created_at"],
-                                       updated_at=cmd_obj["updated_at"])
+                                       defaults={
+                                           "user": user, "text": cmd_obj["comment_text"],
+                                           "created_at": cmd_obj["created_at"],
+                                           "updated_at": cmd_obj["updated_at"]
+                                       })
 
     command, _ = ActiveIssueCommands.get_or_create(comment=comment,
                                                    issue=issue)
@@ -91,12 +93,14 @@ def post_command_status_update(api, cmd, has_votes):
         # New response comment
         resp = gh.comments.leave_comment(api, settings.URN, cmd.issue.issue_id, body)
 
-    user, _ = User.get_or_create(login=resp["user"]["login"],
-                                 user_id=resp["user"]["id"])
+    user, _ = User.get_or_create(user_id=resp["user"]["id"],
+                                 defaults={"login": resp["user"]["login"]})
     resp_comment, _ = Comment.get_or_create(comment_id=resp["id"],
-                                            user=user, text=body,
-                                            created_at=resp["created_at"],
-                                            updated_at=resp["updated_at"])
+                                            defaults={
+                                                "user": user, "text": body,
+                                                "created_at": resp["created_at"],
+                                                "updated_at": resp["updated_at"]
+                                            })
     ActiveIssueCommands.update(chaos_response=resp_comment).where(
                                ActiveIssueCommands.comment == cmd.comment.comment_id).execute()
 
@@ -139,10 +143,8 @@ def handle_vote_command(api, command, issue_id, comment_id, votes):
         sub_command = command.pop(0)
         if sub_command == "close":
             gh.issues.close_issue(api, settings.URN, issue_id)
-            gh.comments.leave_issue_closed_comment(api, settings.URN, issue_id)
         elif sub_command == "reopen":
             gh.issues.open_issue(api, settings.URN, issue_id)
-            gh.comments.leave_issue_reopened_comment(api, settings.URN, issue_id)
         else:
             # Implement other commands
             pass
